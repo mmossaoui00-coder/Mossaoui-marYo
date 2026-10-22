@@ -1,0 +1,29 @@
+
+name: Build Mario APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Build APK
+        run: |
+          mkdir -p output
+          echo "HTML game files need an Android wrapper before APK can be built."
+          if [ ! -f index.html ]; then
+            echo "index.html not found"
+            exit 1
+          fi
+          echo "Game source found. APK packaging is not configured yet."
+          exit 1
