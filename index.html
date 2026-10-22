@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>مغامرات البطل</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#101b39;color:white;font-family:Arial,sans-serif;text-align:center;overflow:hidden}
+header{padding:10px;background:#172650;font-size:21px;font-weight:bold}
+#info{display:flex;justify-content:space-around;padding:10px;font-size:16px;background:#233765}
+canvas{display:block;width:100%;height:calc(100dvh - 190px);min-height:240px;background:#78d8ff;touch-action:none}
+#controls{display:flex;justify-content:space-around;align-items:center;padding:12px;gap:12px;background:#101b39}
+button{border:0;border-radius:15px;background:#ffbd35;color:#17203b;font-size:22px;font-weight:bold;padding:14px 20px;touch-action:none}
+button:active{transform:scale(.93);background:#ff7b36}
+#message{position:absolute;top:40%;left:5%;right:5%;background:#172650ed;padding:20px;border-radius:18px;display:none;z-index:2}
+#message button{margin-top:10px}
+.small{font-size:12px;color:#d4e4ff;padding:5px}
+</style>
+</head>
+<body>
+<header>⭐ مغامرات البطل ⭐</header>
+<div id="info">
+<span>🪙 <b id="coins">0</b></span>
+<span>❤️ <b id="lives">3</b></span>
+<span>🏁 المرحلة <b id="level">1</b>/5</span>
+</div>
+<canvas id="game"></canvas>
+<div id="message">
+<h2 id="msgTitle">أحسنت!</h2>
+<p id="msgText"></p>
+<button onclick="nextAction()" id="nextBtn">تابع اللعب</button>
+</div>
+<div id="controls">
+<button id="left">⬅️</button>
+<button id="jump">⬆️ قفز</button>
+<button id="right">➡️</button>
+</div>
+<div class="small">اجمع العملات ⭐ واقفز فوق الأعداء للوصول إلى العلم!</div>
+<script>
+const canvas=document.getElementById('game');
+const ctx=canvas.getContext('2d');
+let W=800,H=450;
+function resize(){
+const r=canvas.getBoundingClientRect();
+canvas.width=Math.max(320,Math.floor(r.width*devicePixelRatio));
+canvas.height=Math.max(240,Math.floor(r.height*devicePixelRatio));
+W=canvas.width;H=canvas.height;
+}
+window.addEventListener('resize',resize);resize();
+
+let level=1,coins=0,lives=3,running=true,paused=false;
+let keys={left:false,right:false};
+let player, platforms, treasures, enemies, goal, camera=0;
+const gravity=.65;
+
+function makeLevel(n){
+const ground=H-48;
+const length=2200+n*450;
+platforms=[{x:0,y:ground,w:length,h:100}];
+for(let i=0;i<12+n*2;i++){
+let x=220+i*145;
+platforms.push({x,y:ground-75-(i%3)*48,w:85+(i%2)*35,h:18});
+}
+treasures=[];
+for(let i=0;i<Math.floor(length/105);i++){
+treasures.push({x:100+i*105,y:ground-90-(i%3)*38,got:false});
+}
+enemies=[];
+for(let i=0;i<5+n*2;i++){
+let x=350+i*210;
+enemies.push({x,y:ground-30,v:1.2+n*.25,alive:true,min:x-45,max:x+45});
+}
+goal=length-90;
+player={x:40,y:ground-45,w:29,h:39,vx:0,vy:0,onGround:false};
+camera=0;
+updateInfo();
+}
+function updateInfo(){
+document.getElementById('coins').textContent=coins;
+document.getElementById('lives').textContent=lives;
+document.getElementById('level').textContent=level;
+}
+function showMessage(title,text,btn){
+paused=true;
+document.getElementById('msgTitle').textContent=title;
+document.getElementById('msgText').textContent=text;
+document.getElementById('nextBtn').textContent=btn;
+document.getElementById('message').style.display='block';
+}
+function nextAction(){
+document.getElementById('message').style.display='none';
+if(lives<=0){lives=3;coins=0;level=1;makeLevel(level);}
+else if(player.x>=goal){
+if(level>=5){level=1;coins=0;makeLevel(level);}
+else{level++;makeLevel(level);}
+}else if(player.y>H+100){
+lives--;updateInfo();
+if(lives<=0){showMessage('انتهت اللعبة','حاول مرة أخرى واجمع العملات!','إعادة اللعب');return;}
+makeLevel(level);
+}
+paused=false;
+}
+function jump(){
+if(!paused&&player.onGround){player.vy=-13;player.onGround=false;}
+}
+function bind(id,key){
+let b=document.getElementById(id);
+b.addEventListener('pointerdown',e=>{e.preventDefault();keys[key]=true;b.setPointerCapture(e.pointerId);});
+b.addEventListener('pointerup',e=>{e.preventDefault();keys[key]=false;});
+b.addEventListener('pointercancel',()=>keys[key]=false);
+b.addEventListener('lostpointercapture',()=>keys[key]=false);
+}
+bind('left','left');bind('right','right');
+document.getElementById('jump').addEventListener('pointerdown',e=>{e.preventDefault();jump();});
+window.addEventListener('keydown',e=>{
+if(['ArrowLeft','ArrowRight','ArrowUp',' '].includes(e.key))e.preventDefault();
+if(e.key==='ArrowLeft'||e.key==='a')keys.right=true;
+if(e.key==='ArrowRight'||e.key==='d')keys.left=true;
+if(e.key==='ArrowUp'||e.key===' ')jump();
+});
+window.addEventListener('keyup',e=>{
+if(e.key==='ArrowLeft'||e.key==='a')keys.right=false;
+if(e.key==='ArrowRight'||e.key==='d')keys.left=false;
+});
+function overlap(a,b){
+return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;
+}
+function update(){
+if(paused)return;
+player.vx=(keys.left? -4:0)+(keys.right?4:0);
+player.x+=player.vx;
+player.vy+=gravity;
+player.y+=player.vy;
+player.onGround=false;
+for(let p of platforms){
+if(overlap(player,p)&&player.vy>=0&&player.y+player.h-player.vy<=p.y+10){
+player.y=p.y-player.h;player.vy=0;player.onGround=true;
+}
+}
+for(let t of treasures){
+if(!t.got&&Math.abs(player.x+player.w/2-t.x)<25&&Math.abs(player.y+player.h/2-t.y)<35){
+t.got=true;coins++;updateInfo();
+}
+}
+for(let e of enemies){
+if(!e.alive)continue;
+e.x+=e.v;
+if(e.x<e.min||e.x>e.max)e.v*=-1;
+if(overlap(player,{x:e.x-15,y:e.y-25,w:30,h:28})){
+if(player.vy>1&&player.y+player.h<e.y+12){
+e.alive=false;player.vy=-9;coins+=2;updateInfo();
+}else{
+lives--;updateInfo();
+if(lives<=0){showMessage('انتهت اللعبة','لا تستسلم! يمكنك البدء من جديد.','إعادة اللعب');return;}
+makeLevel(level);return;
+}
+}
+}
+if(player.x<0)player.x=0;
+if(player.y>H+100){lives--;updateInfo();
+if(lives<=0){showMessage('انتهت اللعبة','حاول مجدداً!','إعادة اللعب');return;}
+makeLevel(level);return;
+}
+if(player.x>=goal){
+showMessage(level===5?'🏆 بطل الأبطال!':'🎉 أحسنت!',level===5?'لقد أكملت المراحل الخمس!':'وصلت إلى نهاية المرحلة '+level,'المرحلة التالية');
+}
+camera=Math.max(0,Math.min(player.x-W*.35,platforms[0].w-W));
+}
+function draw(){
+ctx.clearRect(0,0,W,H);
+ctx.save();ctx.scale(devicePixelRatio,devicePixelRatio);
+let w=W/devicePixelRatio,h=H/devicePixelRatio;
+ctx.restore();
+ctx.save();
+ctx.scale(devicePixelRatio,devicePixelRatio);
+w=W/devicePixelRatio;h=H/devicePixelRatio;
+const scale=w/800;
+ctx.scale(scale,scale);
+const viewH=h/scale;
+ctx.translate(-camera,0);
+// السماء والغيوم
+ctx.fillStyle='#78d8ff';ctx.fillRect(camera,0,9000,viewH);
+for(let i=0;i<20;i++){
+let x=i*250+60;
+ctx.fillStyle='rgba(255,255,255,.9)';
+ctx.beginPath();ctx.arc(x,65,23,0,7);ctx.arc(x+25,52,30,0,7);ctx.arc(x+53,67,22,0,7);ctx.fill();
+}
+// الجبال
+for(let i=0;i<18;i++){
+let x=i*300;
+ctx.fillStyle='#53b58c';
+ctx.beginPath();ctx.moveTo(x,viewH-48);ctx.lineTo(x+120,viewH-210);ctx.lineTo(x+250,viewH-48);ctx.fill();
+}
+for(let p of platforms){
+ctx.fillStyle='#8a4b25';ctx.fillRect(p.x,p.y,p.w,p.h);
+ctx.fillStyle='#35bd52';ctx.fillRect(p.x,p.y,p.w,9);
+ctx.fillStyle='#b77a41';
+for(let x=p.x+8;x<p.x+p.w;x+=30)ctx.fillRect(x,p.y+20,18,5);
+}
+for(let t of treasures){
+if(t.got)continue;
+ctx.fillStyle='#ffcf28';ctx.beginPath();ctx.arc(t.x,t.y,10,0,7);ctx.fill();
+ctx.strokeStyle='#fff3a1';ctx.lineWidth=3;ctx.stroke();
+}
+for(let e of enemies){
+if(!e.alive)continue;
+ctx.fillStyle='#923c8c';ctx.beginPath();ctx.arc(e.x,e.y-10,15,0,7);ctx.fill();
+ctx.fillStyle='white';ctx.fillRect(e.x-9,e.y-15,6,8);ctx.fillRect(e.x+3,e.y-15,6,8);
+ctx.fillStyle='#222';ctx.fillRect(e.x-7,e.y-12,3,4);ctx.fillRect(e.x+5,e.y-12,3,4);
+ctx.fillStyle='#563057';ctx.fillRect(e.x-12,e.y+2,9,6);ctx.fillRect(e.x+3,e.y+2,9,6);
+}
+ctx.fillStyle='#f4f4f4';ctx.fillRect(goal,viewH-145,5,97);
+ctx.fillStyle='#ff465a';ctx.beginPath();ctx.moveTo(goal+5,viewH-145);ctx.lineTo(goal+65,viewH-125);ctx.lineTo(goal+5,viewH-105);ctx.fill();
+// البطل
+ctx.fillStyle='#e73535';ctx.fillRect(player.x+3,player.y,23,10);
+ctx.fillStyle='#ffca91';ctx.fillRect(player.x+6,player.y+9,19,12);
+ctx.fillStyle='#222';ctx.fillRect(player.x+19,player.y+13,3,4);
+ctx.fillStyle='#2878f0';ctx.fillRect(player.x+3,player.y+21,24,13);
+ctx.fillStyle='#ffca91';ctx.fillRect(player.x,player.y+22,6,10);
+ctx.fillRect(player.x+25,player.y+22,6,10);
+ctx.fillStyle='#442b27';ctx.fillRect(player.x+2,player.y+33,11,6);ctx.fillRect(player.x+17,player.y+33,11,6);
+ctx.restore();
+}
+function loop(){update();draw();requestAnimationFrame(loop);}
+makeLevel(1);loop();
+</script>
+</body>
+</html>
